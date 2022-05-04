@@ -1,4 +1,4 @@
 # advanceProgrammingProject
-code of a data structure to represent xml files and a generator that uses reflection to represent objects in a xml format.
+A library that contains a data structure to represent xml files and has many functionality that allow you to interact with it
 
 Each file contains a main function in order to see how the program works.
