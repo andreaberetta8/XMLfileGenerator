@@ -1,40 +1,6 @@
 import kotlin.reflect.*
 import kotlin.reflect.full.*
 
-// know if a KClassifier is an enumerated
-    fun KClassifier?.isEnum() = this is KClass<*> && this.isSubclassOf(Enum::class)
-
-    // get a list of constants of an enumerated type
-    fun <T : Any> KClass<T>.enumConstants(): List<T> {
-        require(isEnum()) { "class must be enum" }
-        return this.java.enumConstants.toList()
-    }
-
-
-
-
-     /*fun mapType(c: KProperty<*>): String =
-        (if (c.returnType.classifier.isEnum())
-            c.name + (c.returnType.classifier as KClass<*>).enumConstants().joinToString { "'$it'" } + ")"
-        else if (c.returnType.classifier == String::class && c.hasAnnotation<Length>())
-            "VARCHAR(${c.findAnnotation<Length>()!!.size})"
-        else
-            when (c.returnType.classifier) {
-                String::class -> "CHAR"
-                Int::class -> "INT"
-                Double::class -> "DOUBLE"
-                Boolean::class -> "BIT"
-                else -> fail("not supported")
-            }) +
-                if (!c.returnType.isMarkedNullable && !c.hasAnnotation<XmlName>())
-                    " NOT NULL"
-                else if (c.hasAnnotation<XmlName>())
-                    " PRIMARY KEY"
-                else
-                    ""
-
-*/
-
 class XMLGenerator() {
 
     //returns the list of properties in declaration order
