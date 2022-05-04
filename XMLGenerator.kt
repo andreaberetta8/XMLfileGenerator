@@ -12,30 +12,6 @@ import kotlin.test.DefaultAsserter.fail
     }
 
 
-
-
-     /*fun mapType(c: KProperty<*>): String =
-        (if (c.returnType.classifier.isEnum())
-            c.name + (c.returnType.classifier as KClass<*>).enumConstants().joinToString { "'$it'" } + ")"
-        else if (c.returnType.classifier == String::class && c.hasAnnotation<Length>())
-            "VARCHAR(${c.findAnnotation<Length>()!!.size})"
-        else
-            when (c.returnType.classifier) {
-                String::class -> "CHAR"
-                Int::class -> "INT"
-                Double::class -> "DOUBLE"
-                Boolean::class -> "BIT"
-                else -> fail("not supported")
-            }) +
-                if (!c.returnType.isMarkedNullable && !c.hasAnnotation<XmlName>())
-                    " NOT NULL"
-                else if (c.hasAnnotation<XmlName>())
-                    " PRIMARY KEY"
-                else
-                    ""
-
-*/
-
 class XMLGenerator() {
 
     //returns the list of properties in declaration order
