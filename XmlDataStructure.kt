@@ -1,4 +1,7 @@
-interface IObservable<O> {
+/**
+ * an interface that provide methods to implement the observer pattern
+ */
+interface IObservable <O> {
     val observers: MutableList<O>
 
     fun addObserver(observer: O) {
@@ -15,24 +18,41 @@ interface IObservable<O> {
 }
 
 
-
+/**
+ * an interface for views that provide methods to interact with the data structure
+ */
 interface XMlListener{
     fun rename(newName:String)
     fun setAttribute(key:String,value:String)
     fun editAttribute(key:String,newValue:String)
     fun cancelAttribute(key:String)
-    fun drawEntity(el:XMLElement)
-    fun drawTextEntity(el:XMLElement)
-    fun cancelEntity()
+    fun drawEntityAndChildren(el:XMLElement)
+    fun cancelEntity(el:XMLElement)
 }
-abstract class XMLElement(name: String, var parent: Entity? = null) :IObservable<XMlListener> {
 
+/**
+ * this class represent a general entity in an XML file.
+ * a general XMLElement has a name and a parent, and it can have attributes
+ * the class is Observable through the XMlListener interface
+ */
+abstract class XMLElement(name: String, var parent: Entity? = null) :IObservable<XMlListener> {
+    /**
+     * the list of the views that observe this class
+     */
     override val observers: MutableList<XMlListener> = mutableListOf()
+
+    /**
+     * the list of the entity's attributes
+     */
+    var atb = mutableListOf<Attribute>()
 
     init {
         parent?.children?.add(this)
     }
 
+    /**
+     * name of the entity
+     */
     var name = name
     set(value){
         field=value
@@ -41,65 +61,26 @@ abstract class XMLElement(name: String, var parent: Entity? = null) :IObservable
         }
     }
 
+    /**
+     *  effect: deletes this entity and returns it
+     * modifies: notifies all the observers about the update
+     */
      open fun removeEntity():XMLElement?{
          val l=this.parent?.children
+             l?.remove(this)
+             notifyObservers {
+                 it.cancelEntity(this)
+             }
 
-         val removed= l?.find{ x->x.name==this.name}
-
-         l?.remove(removed)
-         notifyObservers {
-             it.cancelEntity()
-         }
-         return removed
+         return this
      }
 
-
-    abstract fun accept(v: XMLVisitor)
-
-    //print the element
-    abstract fun print()
-}
-
-class TextEntity(name: String,val text:String, parent: Entity? = null) : XMLElement(name, parent) {
-
-    override fun print(){
-        println("<${this.name}> ${this.text} </${this.name}>")
-    }
-
-    override fun accept(v: XMLVisitor) {
-        v.visit(this)
-    }
-}
-
-class Entity(name: String, parent: Entity? = null) : XMLElement(name, parent) {
-    var atb = mutableListOf<Attribute>()
-
-    constructor(name:String,parent: Entity? ,attributes:List<Attribute>) : this(name,parent) {
-        atb=attributes as MutableList<Attribute>
-    }
-
-    var children = mutableListOf<XMLElement>()
-
-
-    //create an Entity child for this Entity
-    fun addEntityChild(name:String,parent:Entity?):Entity{
-        val e=Entity(name,parent)
-        notifyObservers {
-            it.drawEntity(e)
-        }
-        return e
-    }
-
-    //create and add an Entity with text to this Entity
-    fun addTextEntityChild(name:String,text:String):TextEntity?{
-        val te=TextEntity(name,text,this)
-        notifyObservers {
-            it.drawTextEntity(te)
-        }
-        return te
-    }
-
-    //add an attribute to the list of attributes of the entity
+    /**
+     * @param key : the name of the attribute
+     * @param value : the value of the attribute
+     * effect: creates a new Attribute with the key and value passed as arguments, and adds it to the
+     * modifies: notifies all the observers about the update
+     */
     fun addAttribute(key:String,value:String){
         atb?.add(Attribute(key,value))
         notifyObservers {
@@ -107,20 +88,33 @@ class Entity(name: String, parent: Entity? = null) : XMLElement(name, parent) {
         }
     }
 
-    //edit value of attribute if found
-    fun editAttribute(key:String,newValue:String){
+    /**
+     * @param key : the name of the attribute
+     * @param newValue : the  new value of the attribute
+     * effect: if found, it replaces the value of the attributed named key with newValue. it returns the old value
+     * modifies: if the attribute is found, notifies all the observers about the update
+     */
+    fun editAttribute(key:String,newValue:String):String{
         var att=atb.find{e -> e.key==key }
 
+        var oldName=""
         if (att !=null) {
+            oldName=att.value
             att.value = newValue
             notifyObservers {
                 it.editAttribute(att!!.key, newValue)
             }
         }
+        return oldName
     }
 
-    //if present, delete the attribute whose name is the string passed as argument
-    fun removeAttribute(key:String){
+    /**
+     * @param key : the name of the attribute to delete
+     * effect: if found, delete the attribute whose name is key
+     * modifies: if the attribute is found, notifies all the observers about the update
+     */
+
+    fun removeAttribute(key:String):Attribute?{
         var att=atb.find{e -> e.key==key }
 
         if (att !=null) {
@@ -129,30 +123,111 @@ class Entity(name: String, parent: Entity? = null) : XMLElement(name, parent) {
                 it.cancelAttribute(att.key)
             }
         }
+        return att
     }
-    //check if an entity has at least one attribute
+
+    /**
+     *  returns true if this has at least one attribute, if not it returns false
+     */
     fun hasAttribute():Boolean=atb.isNotEmpty()
 
-    override fun print(){
-        if (this.atb!!.isNotEmpty()) {//if attribute!=null
-            var s="<${this.name} "
-            for (att in this.atb)
-                s+=att.toString()
-            s+="> <${this.name} >"
-            println(s)
-        }else
-            println("<${this.name} >")
+    /**
+     * @param v: the visitor object
+     * effect: it calls the visit method of v
+     */
+    abstract fun accept(v: XMLVisitor)
+
+}
+
+/**
+ * this class represents an entity with text
+ */
+class TextEntity(name: String,val text:String, parent: Entity? = null) : XMLElement(name, parent) {
+
+    /**
+     * returns a string representation of the object
+     */
+    override fun toString():String{
+        return "<${this.name}>"+ if (atb.isNotEmpty()) atb.joinToString(" ") else {""} + " ${this.text} </${this.name}>"
     }
 
-    //remove this entity
-    override fun removeEntity(): XMLElement? {
-        val removed=super.removeEntity()
-        if (children.isNotEmpty())
-            children.forEach{
-                it.parent=this.parent
-            }
-        return removed
+    override fun accept(v: XMLVisitor) {
+        v.visit(this)
     }
+}
+
+/**
+ * this class represent an entity which can have nested XMLElement objects
+ */
+class Entity(name: String, parent: Entity? = null) : XMLElement(name, parent) {
+
+    constructor(name:String,parent: Entity? ,attributes:List<Attribute>) : this(name,parent) {
+        atb=attributes as MutableList<Attribute>
+    }
+
+    /**
+     * the list of nested XMLElements objects
+     */
+    var children = mutableListOf<XMLElement>()
+
+    /**
+     * @param name: the name of the new Entity
+     * effect: add a new entity named as name to 'this' list of nested entities, and it returns it
+     */
+    fun addEntityChild(name:String):Entity{
+        val e=Entity(name,this)
+        notifyObservers {
+            it.drawEntityAndChildren(e)
+        }
+        return e
+    }
+
+    /**
+     * @param e: the child XMLElement to add
+     * effect: add e to 'this' list of nested entities, and it returns it
+     */
+    fun addEntityChild(e:XMLElement):XMLElement{
+        this.children.add(e)
+        notifyObservers {
+            it.drawEntityAndChildren(e)
+        }
+        return e
+    }
+
+    /**
+     * @param name: the name of the new entity
+     * @param text : the text of the new entity
+     * effect: add a new entity with text to 'this' list of nested entities, and it returns it
+     */
+    fun addTextEntityChild(name:String,text:String):TextEntity?{
+        val te=TextEntity(name,text,this)
+        notifyObservers {
+            it.drawEntityAndChildren(te)
+        }
+        return te
+    }
+
+    /**
+     * @param name: the name of the new entity
+     * @param text : the text of the new entity
+     * effect: add a new entity with text to 'this' list of nested entities, and it returns it
+     */
+    fun addTextEntityChild(te:TextEntity):TextEntity?{
+        this.children.add(te)
+        notifyObservers {
+            it.drawEntityAndChildren(te)
+        }
+        return te
+    }
+
+
+    /**
+     * returns a string representation of the object
+     */
+    override fun toString():String{
+        return "<${this.name}>"+ if (atb.isNotEmpty()) atb.joinToString(" ") else ""
+    }
+
 
     override fun accept(v: XMLVisitor) {
         if(v.visit(this)) {
@@ -164,15 +239,33 @@ class Entity(name: String, parent: Entity? = null) : XMLElement(name, parent) {
     }
 }
 
-
+/**
+ * this interface represents a specific visitor object for this xml data structure, it lists methods to achieve visiting XMlElement objects
+ */
 interface XMLVisitor {
+    /**
+     * @param e: the visiting entity with text
+     * effect: it defines the actions to execute while visiting e
+     */
     fun visit(e: TextEntity) {}
+    /**
+     * @param e: the visiting entity with text
+     * effect: it defines the actions to perform while visiting e, if the visit has to stop, it returns false, otherwise true
+     */
     fun visit(e: Entity) = true
+
+    /**
+     * @param e: the visiting entity
+     * effect: it defines the actions to execute before ending the visit of e
+     */
     fun endVisit(e: Entity) {}
 }
 
 
-//check if an XMLElement is inside the structure using its name,if not it returns null, otherwise it returns the found element
+/**
+ * @param name: the name of the entity to find
+ * effect: check the XMLElement named as 'name' is inside the structure ,if not it returns null, otherwise it returns the found object
+ */
 fun Entity.findVisitor(name: String): XMLElement? {
     var el: XMLElement? = null
     val v = object : XMLVisitor {
@@ -194,7 +287,10 @@ fun Entity.findVisitor(name: String): XMLElement? {
     return el
 }
 
-//filter the entities visited and produce an XMLELement structure
+/**
+ * @param lmbd : the predicate used to filter the data structure
+ * effect: it filters the data structure based on lmbd, and produce the resulted data structure. it returns the head of the data structure
+ */
 fun XMLElement.filter(lmbd: (XMLElement) -> Boolean ):Entity? {
     var firstElement:Entity?=null
     var tmpParent:Entity?=null   //represent the Entity that will be the parent of the next Entity
@@ -234,57 +330,72 @@ fun XMLElement.filter(lmbd: (XMLElement) -> Boolean ):Entity? {
         return firstElement
     }
 
-//print all the subentity of the current object
-fun Entity.printVisitor() {
+/**
+ * effect: print a serialization of this entity and its nested entities
+ */
+fun Entity.serialize() :String{
+    var toReturn=""
     accept(object : XMLVisitor {
         var depth = 0
         override fun visit(e: TextEntity) {
-            println("\t".repeat(depth) + "<${e.name}> ${e.text} </${e.name}>")
+            toReturn+="\t".repeat(depth) + "$e\n"
+
         }
 
         override fun visit(e: Entity): Boolean {
-            if (e.atb!!.isNotEmpty()) {//if attribute!=null
-                var s="\t".repeat(depth) + "<${e.name} "
-                for (att in e.atb)
-                    s+=att.toString()
-                s+=">"
-                println(s)
-            }else
-                println("\t".repeat(depth) + "<${e.name}>")//print name
+            toReturn+="\t".repeat(depth) +"$e\n"
             depth++
             return true
         }
 
         override fun endVisit(e: Entity) {
             depth--
-            println("\t".repeat(depth) + "</${e.name}>")
-
+            toReturn+=("\t".repeat(depth) + "</${e.name}>\n")
         }
+
     })
+    return toReturn
 }
 
-
-//represent an attribute in xml which is composed by a key and a value
+/**
+ * represent a xml attribute which is composed by a key and a value
+ */
 class Attribute(val key:String, var value:String){
 
       override fun toString():String= "$key='$value' "
 
 }
 
+/**
+ * @param name: name of the document
+ * @param head: root entity of the document
+ * an instance of this class represent an xml file
+ */
 class XMLDocument(val name:String, val head:Entity){
     private val header="<?xml version='1.0' encoding='UTF-8'?>"
 
-    //returns an XMLDocument instance from this ,after filtering based on f
+    /**
+     * @param f: the predicate used to filter this
+     * effect: it returns an XMLDocument object from this ,after a filtering action based on f
+     */
      fun XMlfilter(f :(XMLElement)->Boolean) :XMLDocument{
          return XMLDocument("filteredDoc", head.filter(f) as Entity)
      }
-    //returns null if there is no element with such a name in the document
+
+    /**
+     * @param name : the name of the XMLElement object to find
+     * effect: returns null if there is no XMLElement object named as name in the document
+     */
      fun findEntity(name:String):XMLElement?{
         return head.findVisitor(name)
     }
+
+    /**
+     * effect: print a string representation of the document
+     */
      fun printDocument(){
         println(header)
-        head.printVisitor()
+        println(head.serialize())
     }
 }
 fun main() {
@@ -294,8 +405,9 @@ fun main() {
     e1.addAttribute("year ","2008")
     val t1=TextEntity("1film","mission impossible",e1)
     val t2=TextEntity("2film","joker",e1)
-    val e2=Entity("filter2",e1)
+    val e2=e1.addEntityChild("filter2")
     e2.addAttribute("year ","2008")
+    t1.addAttribute("bello","bellissimo")
     val t3=TextEntity("1film","mission impossible",e2)
     val e3=Entity("select",e2)
     val t4=TextEntity("press button","film selected",e3)
@@ -304,9 +416,10 @@ fun main() {
 
 
     val d=XMLDocument("filmSelection",e1)
-    d.printDocument()
+    //d.printDocument()
     //print(d.findEntity("1film")?.name)
     //d.XMlfilter { e-> e.name!="select" }.printDocument()
+    println(t1.toString())
 
 
 }
