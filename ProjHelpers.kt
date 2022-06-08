@@ -1,7 +1,6 @@
 import java.awt.*
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.util.*
 import javax.swing.*
 import javax.swing.border.CompoundBorder
 
@@ -9,13 +8,7 @@ import javax.swing.border.CompoundBorder
 class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() {
 
     val component=this
-
-    fun printStatus(){
-        var e:Entity=ent as Entity
-        while (e.parent!=null)
-            e= e.parent!!
-        e.printVisitor()
-    }
+    var obs:XMlListener?=null
 
     override fun paintComponent(g: Graphics) {
         super.paintComponent(g)
@@ -26,15 +19,15 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
 
     fun getAttributeValue(key:String):JTextField?{
         var flag=false
-       for (c in components)
-           if (c is JPanel)
-               for (l in c.components) {
-                   if (l is JLabel && l.text==key)
-                       flag=true
-                   if (l is JTextField && flag)
-                       return l
-               }
-       return null
+        for (c in components)
+            if (c is JPanel)
+                for (l in c.components) {
+                    if (l is JLabel && l.text==key)
+                        flag=true
+                    if (l is JTextField && flag)
+                        return l
+                }
+        return null
     }
     init {
 
@@ -43,20 +36,21 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
             BorderFactory.createEmptyBorder(30, 10, 10, 10),
             BorderFactory.createLineBorder(Color.BLACK, 2, true)
         )
-        ent.addObserver(object:XMlListener{
+        val observerObject=object:XMlListener{
+
             override fun rename(newName: String) {
                 repaint()
             }
 
             override fun setAttribute(key:String,value:String) {
-                    val panel = JPanel()
-                    val chiave = JLabel(key)
-                    val valore = JTextField(value)
-                    add(panel)
-                    panel.add(chiave)
-                    panel.add(valore)
-                    revalidate()
-                    return
+                val panel = JPanel()
+                val chiave = JLabel(key)
+                val valore = JTextField(value)
+                add(panel)
+                panel.add(chiave)
+                panel.add(valore)
+                revalidate()
+                return
 
             }
 
@@ -79,31 +73,41 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
                             }
             }
 
-            override fun drawEntity(el:XMLElement) {
+            override fun drawEntityAndChildren(el:XMLElement) {
+
                 val cmp=EntityRepresentation(el,contr)
                 add(cmp)
-                cmp.printStatus()
+                if (el.atb.isNotEmpty())
+                    el.atb.forEach{
+                        cmp.obs?.setAttribute(it.key,it.value)
+                    }
+                if (el is Entity){
+                    if (el.children.isNotEmpty())
+                        el.children.forEach {
+                            var element=it
+                            cmp.obs?.drawEntityAndChildren(it)
+
+                        }
+
+                }else{
+                    val te=el as TextEntity
+                    cmp.add(JLabel(te.text))
+                }
                 revalidate()
+
             }
 
-            override fun drawTextEntity(el: XMLElement) {
-                val cmp=EntityRepresentation(el,contr)
-                add(cmp)
-                val te=el as TextEntity
-                cmp.add(JLabel(te.text))
+            override fun cancelEntity(el:XMLElement) {
+
+                parent.remove(component)
                 revalidate()
+                repaint()
+                el.removeObserver(this)
             }
 
-            override fun cancelEntity() {
-               val toDelete= parent.components[0]
-               val toSave=if (components.isNotEmpty()) components else null
-                if (toSave!=null) toSave.forEach{ parent.add(it)}
-                parent.remove(toDelete)
-                revalidate()
-               repaint()
-            }
-
-        })
+        }
+        ent.addObserver(observerObject)
+        obs=observerObject
         createPopupMenu()
     }
 
@@ -114,7 +118,7 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
         a.addActionListener {
             if ( ent is Entity) {
                 val text = JOptionPane.showInputDialog("name of the entity")
-                contr.addEntity(ent,text, ent)
+                contr.addEntity(ent,text)
             }else
                 JOptionPane.showMessageDialog(null, "This is an entity with text,it can't have a child");
         }
@@ -126,7 +130,7 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
                 val name = JOptionPane.showInputDialog("name of the entity")
                 val text = JOptionPane.showInputDialog("text of the entity")
                 contr.addTextEntity(ent,name,text)
-             }else{
+            }else{
                 JOptionPane.showMessageDialog(null, "This is an entity with text,it can't have a child");
             }
         }
@@ -135,13 +139,9 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
         val c = JMenuItem("Add attribute")
 
         c.addActionListener {
-            if (ent is TextEntity){
-                JOptionPane.showMessageDialog(null, "This is an entity with text, you can't add attributes");
-            }else {
-                val name = JOptionPane.showInputDialog("insert name of the attribute")
-                val v = JOptionPane.showInputDialog("insert value of the attribute")
-                contr.addNewAttribute(ent,name, v)
-            }
+            val name = JOptionPane.showInputDialog("insert name of the attribute")
+            val v = JOptionPane.showInputDialog("insert value of the attribute")
+            contr.addNewAttribute(ent,name, v)
         }
         popupmenu.add(c)
 
@@ -161,13 +161,9 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
 
         val f = JMenuItem("edit attribute")
         f.addActionListener {
-            if (ent is TextEntity){
-                JOptionPane.showMessageDialog(null, "This is an entity with text, it doesn't have attributes");
-            }else {
-                val key = JOptionPane.showInputDialog("name of the attribute you want to edit")
-                val v1 = JOptionPane.showInputDialog("insert new value")
-                contr.modifyAttribute(ent,key,v1)
-            }
+            val key = JOptionPane.showInputDialog("name of the attribute you want to edit")
+            val v1 = JOptionPane.showInputDialog("insert new value")
+            contr.modifyAttribute(ent,key,v1)
         }
         popupmenu.add(f)
 
@@ -183,7 +179,14 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
         }
         popupmenu.add(h)
 
-       addMouseListener(object : MouseAdapter() {
+        val o = JMenuItem("generate XMl file")
+        o.addActionListener {
+            val text = JOptionPane.showInputDialog("insert the name of the file")
+            contr.generateXMlFile(ent, "$text.txt")
+
+        }
+        popupmenu.add(o)
+        addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (SwingUtilities.isRightMouseButton(e))
                     popupmenu.show(this@EntityRepresentation, e.x, e.y)
@@ -192,17 +195,17 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
     }
 }
 
+///////////CHECK INTERFACE IOBSERVABLE
+class View(model:XMLElement, contr:Controller) : JFrame("title")/*,IObservable<XMlListener>*/ {
 
-class View(model:XMLElement, contr:Controller) : JFrame("title"),IObservable<XMlListener> {
-
-    override val observers: MutableList<XMlListener> = mutableListOf()
+    //override val observers: MutableList<XMlListener> = mutableListOf()
 
 
     init {
         defaultCloseOperation = JFrame.EXIT_ON_CLOSE
         size = Dimension(300, 300)
 
-        add(EntityRepresentation(model,contr))
+        this.add(EntityRepresentation(model,contr))
     }
 
     fun open() {
@@ -211,49 +214,6 @@ class View(model:XMLElement, contr:Controller) : JFrame("title"),IObservable<XMl
 
 }
 
-interface Command {
-    fun run()
-    fun undo()
-}
-
-class UndoStack {
-    val stack = Stack<Command>()
-
-    fun execute(c: Command) {
-        c.run()
-        stack.add(c)
-    }
-
-    fun undo() {
-        if (stack.isNotEmpty())
-            stack.pop().undo()
-    }
-}
-
-class AddEntityCommand(val e:Entity,val name:String,val parent:Entity?):Command{
-    var ent:Entity?=null
-    override fun run() {
-        ent=e.addEntityChild(name,parent)
-    }
-
-    override fun undo() {
-        ent?.removeEntity()
-    }
-}
-
-class AddAttributeCommand(val e:Entity,val key:String,val value:String):Command{
-
-    override fun run() {
-        e.addAttribute(key,value)
-    }
-
-    override fun undo() {
-        e.removeAttribute(key)
-    }
-}
-
-
-
 /*running UI*/
 fun main() {
     val e = Entity("root",null)
@@ -261,6 +221,4 @@ fun main() {
     val w = View(e,contr)
 
     w.open()
-
 }
-
