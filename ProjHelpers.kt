@@ -84,7 +84,6 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
                 if (el is Entity){
                     if (el.children.isNotEmpty())
                         el.children.forEach {
-                            var element=it
                             cmp.obs?.drawEntityAndChildren(it)
 
                         }
@@ -94,7 +93,6 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
                     cmp.add(JLabel(te.text))
                 }
                 revalidate()
-
             }
 
             override fun cancelEntity(el:XMLElement) {
@@ -179,6 +177,12 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
         }
         popupmenu.add(h)
 
+        val h1 = JMenuItem("redo")
+        h.addActionListener {
+            contr.goAhead()
+        }
+        popupmenu.add(h1)
+
         val o = JMenuItem("generate XMl file")
         o.addActionListener {
             val text = JOptionPane.showInputDialog("insert the name of the file")
@@ -195,11 +199,8 @@ class EntityRepresentation(val ent: XMLElement,val contr:Controller) : JPanel() 
     }
 }
 
-///////////CHECK INTERFACE IOBSERVABLE
-class View(model:XMLElement, contr:Controller) : JFrame("title")/*,IObservable<XMlListener>*/ {
 
-    //override val observers: MutableList<XMlListener> = mutableListOf()
-
+class View(model:XMLElement, contr:Controller) : JFrame("title") {
 
     init {
         defaultCloseOperation = JFrame.EXIT_ON_CLOSE
@@ -222,3 +223,4 @@ fun main() {
 
     w.open()
 }
+
