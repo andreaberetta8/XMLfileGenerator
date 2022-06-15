@@ -2,9 +2,7 @@ import java.io.File
 import java.util.*
 
 
-var flagAddE=false
-var flagAddTextE=false
-var elSpecialUndo:XMLElement?=null
+
 /**
  * this class represent the controller used in the mvc design pattern,it specifically controls this model (XMLElement) and
  */
@@ -28,7 +26,7 @@ class Controller() {
     fun deleteEntity(e:XMLElement){
         val remCommand=RemoveEntityCommand(e)
         listOfCommand.execute(remCommand)
-        elSpecialUndo=remCommand.deleted
+
     }
 
     fun addNewAttribute(e:XMLElement,key:String?,value:String?){
@@ -47,23 +45,18 @@ class Controller() {
     }
 
     fun addTextEntity(e:XMLElement,name:String,text:String){
-        if (flagAddTextE){
-            elSpecialUndo?.removeEntity()
-            flagAddTextE=false
-            return
-        }
+
             val ent = e as Entity
             listOfCommand.execute(AddTextEntityCommand(ent, name, text))
     }
 
-
-
-
     fun goBack(){
-        val commands=listOfCommand.stack
-        if (!commands.empty())
-           listOfCommand.undo()
-        }
+       listOfCommand.undo()
+    }
+
+    fun goAhead(){
+        listOfCommand.redo()
+    }
 
 
     fun generateXMlFile(ent:XMLElement?,name:String){
@@ -78,14 +71,20 @@ class Controller() {
     }
 }
 
-
+/**
+ * this interface represents a command, which is an action performed on an item.
+ */
 interface Command {
     fun run()
     fun undo()
 }
 
+/**
+ * instances of this class are  objects with 2 stacks, and methods to performs actions on them
+ */
 class UndoStack {
     val stack = Stack<Command>()
+    val redoStack = Stack<Command>()
 
     fun execute(c: Command) {
         c.run()
@@ -93,8 +92,17 @@ class UndoStack {
     }
 
     fun undo() {
-        if (stack.isNotEmpty())
-            stack.pop().undo()
+        if (stack.isNotEmpty()) {
+            stack.peek().undo()
+            redoStack.add(stack.pop())
+        }
+    }
+
+    fun redo() {
+        if (redoStack.isNotEmpty()) {
+            redoStack.peek().run()
+            stack.add(redoStack.pop())
+        }
     }
 }
 
@@ -117,11 +125,6 @@ class AddTextEntityCommand(val e:Entity,val name:String,val text:String):Command
     }
 
     override fun undo() {
-        if (elSpecialUndo!=null)//serve a gestire il caso specialedel doppio undo, in cui ultimo comando dello stack è rimuovi x e il penultimo è aggiungi x
-            if (flagAddTextE && e.name== elSpecialUndo!!.name) {
-                elSpecialUndo!!.removeEntity()
-                return
-            }
         tEnt?.removeEntity()
     }
 }
@@ -135,9 +138,9 @@ class RemoveEntityCommand(val e:XMLElement):Command{
 
     override fun undo() {
         if (deleted!=null) {
-            if (deleted is Entity)
-                e.parent?.addEntityChild(deleted as Entity)
-            else deleted!!.parent?.addTextEntityChild(deleted as TextEntity)
+            if (e is Entity)
+                e.parent?.addEntityChild(e)
+            else e.parent?.addTextEntityChild(e as TextEntity)
         }
     }
 }
