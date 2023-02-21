@@ -1,4 +1,5 @@
 # XMLfileGenerator
-A library that contains a data structure to represent xml files and has many functionality that allow you to interact with it
+this app will convert an object of any class into an XMl file.
+It provides a simple GUI with many features to modify the xml entities tree.
 
-Each file contains a main function in order to see how the program works.
+Each file contains a main in order to see how the program works.
